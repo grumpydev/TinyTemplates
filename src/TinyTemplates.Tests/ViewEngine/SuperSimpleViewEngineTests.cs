@@ -1,5 +1,6 @@
 ﻿namespace Nancy.Tests.Unit.ViewEngines
 {
+    using System;
     using System.Collections.Generic;
     using System.Dynamic;
     using System.Linq;
@@ -414,7 +415,7 @@
         {
             const string input = @"<html><head></head><body><ul>@Each.Users;<li>@Current.Name;</li>@EndEach</ul></body></html>";
             dynamic model = new ExpandoObject();
-            model.Users = new List<User>() { new User("Bob"), new User("Jim"), new User("Bill")};
+            model.Users = new List<User>() { new User("Bob"), new User("Jim"), new User("Bill") };
 
             var output = viewEngine.Render(input, model);
 
@@ -437,23 +438,78 @@
 
             Assert.Equal(@"<html><head></head><body><ul><li>Bob</li><li>Jim</li><li>Bill</li></ul></body></html>", output);
         }
+
+        [Fact]
+        public void Should_allow_sub_properties_using_model_statement()
+        {
+            const string input = @"<h1>Hello @Model.User.Name;</h1>";
+            var model = new { User = new User("Bob") };
+
+            var output = viewEngine.Render(input, model);
+
+            Assert.Equal(@"<h1>Hello Bob</h1>", output);
+        }
+
+        [Fact]
+        public void Should_allow_sub_properties_using_if_statement()
+        {
+            const string input = @"<h1>Hello @If.User.IsFriend;Friend!@EndIf;</h1>";
+            var model = new { User = new User("Bob", true) };
+
+            var output = viewEngine.Render(input, model);
+
+            Assert.Equal(@"<h1>Hello Friend!</h1>", output);
+        }
+
+        [Fact]
+        public void Should_allow_sub_properties_using_ifnot_statement()
+        {
+            const string input = @"<h1>Hello @IfNot.User.IsFriend;Friend!@EndIf;</h1>";
+            var model = new { User = new User("Bob", true) };
+
+            var output = viewEngine.Render(input, model);
+
+            Assert.Equal(@"<h1>Hello </h1>", output);
+        }
+
+        [Fact]
+        public void Should_allow_sub_properties_for_each_statement()
+        {
+            const string input = @"<html><head></head><body><ul>@Each.Sub.Users;<li>@Current;</li>@EndEach</ul></body></html>";
+            var model = new { Sub = new { Users = new List<string>() { "Bob", "Jim", "Bill" } } };
+
+            var output = viewEngine.Render(input, model);
+
+            Assert.Equal(@"<html><head></head><body><ul><li>Bob</li><li>Jim</li><li>Bill</li></ul></body></html>", output);
+        }
+
+        [Fact]
+        public void Should_allow_sub_properties_for_current_statement_inside_each()
+        {
+            const string input = @"<html><head></head><body><ul>@Each.Users;<li>@Current.Item2.Name;</li>@EndEach</ul></body></html>";
+            var model = new { Users = new List<Tuple<int, User>>() { new Tuple<int, User>(1, new User("Bob")), new Tuple<int, User>(1, new User("Jim")), new Tuple<int, User>(1, new User("Bill")) } };
+
+            var output = viewEngine.Render(input, model);
+
+            Assert.Equal(@"<html><head></head><body><ul><li>Bob</li><li>Jim</li><li>Bill</li></ul></body></html>", output);
+        }
     }
 
     public class User
     {
         public User(string name)
-            : this(name, string.Empty)
+            : this(name, false)
         {
         }
 
-        public User(string name, string job)
+        public User(string name, bool isFriend)
         {
             Name = name;
-            Job = job;
+            IsFriend = isFriend;
         }
 
         public string Name { get; private set; }
-        public string Job { get; private set; }
+        public bool IsFriend { get; private set; }
     }
 
     public class FakeModel

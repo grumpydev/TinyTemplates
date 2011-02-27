@@ -69,7 +69,7 @@
 
         /// <summary>
         /// <para>
-        /// Gets the correct property extractor for the given model.
+        /// Gets a property value from the given model.
         /// </para>
         /// <para>
         /// Anonymous types, standard types and ExpandoObject are supported.
@@ -78,41 +78,44 @@
         /// </para>
         /// </summary>
         /// <param name="model">The model.</param>
-        /// <returns>Delegate for getting properties - delegate returns a value or null if not there.</returns>
+        /// <param name="propertyName">The property name to evaluate.</param>
+        /// <returns>Tuple - Item1 being a bool for whether the evaluation was sucessful, Item2 being the value.</returns>
         /// <exception cref="ArgumentException">Model type is not supported.</exception>
-        private Func<object, string, object> GetPropertyExtractor(object model)
+        private static Tuple<bool, object> GetPropertyValue(object model, string propertyName)
         {
+            if (model == null || String.IsNullOrEmpty(propertyName))
+            {
+                return new Tuple<bool, object>(false, null);
+            }
+
             if (!typeof(IDynamicMetaObjectProvider).IsAssignableFrom(model.GetType()))
             {
-                return GetStandardTypePropertyExtractor(model);
+                return StandardTypePropertyEvaluator(model, propertyName);
             }
 
             if (typeof(IDictionary<string, object>).IsAssignableFrom(model.GetType()))
             {
-                return DynamicDictionaryPropertyExtractor;
+                return DynamicDictionaryPropertyEvaluator(model, propertyName);
             }
 
             throw new ArgumentException("model must be a standard type or implement IDictionary<string, object>", "model");
         }
 
         /// <summary>
-        /// <para>Returns the standard property extractor.</para>
-        /// <para>Model properties are enumerated once and a closure is returned that captures them.</para>
+        /// A property extractor for standard types.
         /// </summary>
         /// <param name="model">The model.</param>
-        /// <returns>Delegate for getting properties - delegate returns a value or null if not there.</returns>
-        private static Func<object, string, object> GetStandardTypePropertyExtractor(object model)
+        /// <param name="propertyName">The property name.</param>
+        /// <returns>Tuple - Item1 being a bool for whether the evaluation was sucessful, Item2 being the value.</returns>
+        private static Tuple<bool, object> StandardTypePropertyEvaluator(object model, string propertyName)
         {
             var properties = model.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static);
 
-            return (mdl, propName) =>
-            {
                 var property =
-                    properties.Where(p => String.Equals(p.Name, propName, StringComparison.InvariantCulture)).
-                        FirstOrDefault();
+                    properties.Where(p => String.Equals(p.Name, propertyName, StringComparison.InvariantCulture)).
+                    FirstOrDefault();
 
-                return property == null ? null : property.GetValue(mdl, null);
-            };
+                return property == null ? new Tuple<bool, object>(false, null) : new Tuple<bool, object>(true, property.GetValue(model, null));
         }
 
         /// <summary>
@@ -122,15 +125,55 @@
         /// </summary>
         /// <param name="model">The model.</param>
         /// <param name="propertyName">The property name.</param>
-        /// <returns>Object if property is found, <see langword="null"/> if not.</returns>
-        private static object DynamicDictionaryPropertyExtractor(object model, string propertyName)
+        /// <returns>Tuple - Item1 being a bool for whether the evaluation was sucessful, Item2 being the value.</returns>
+        private static Tuple<bool, object> DynamicDictionaryPropertyEvaluator(object model, string propertyName)
         {
             var dictionaryModel = (IDictionary<string, object>)model;
 
             object output;
-            dictionaryModel.TryGetValue(propertyName, out output);
+            return !dictionaryModel.TryGetValue(propertyName, out output) ? new Tuple<bool, object>(false, null) : new Tuple<bool, object>(true, output);
+        }
 
-            return output;
+        /// <summary>
+        /// Gets an IEnumerable of capture group values
+        /// </summary>
+        /// <param name="m">The match to use.</param>
+        /// <param name="groupName">Group name containing the capture group.</param>
+        /// <returns>IEnumerable of capture group values as strings.</returns>
+        private static IEnumerable<string> GetCaptureGroupValues(Match m, string groupName)
+        {
+            return m.Groups[groupName].Captures.Cast<Capture>().Select(c => c.Value);
+        }
+
+        /// <summary>
+        /// Gets a property value from a collection of nested parameter names
+        /// </summary>
+        /// <param name="model">The model</param>
+        /// <param name="parameters">A collection of nested parameters (e.g. User, Name</param>
+        /// <returns>Tuple - Item1 being a bool for whether the evaluation was sucessful, Item2 being the value.</returns>
+        private static Tuple<bool, object> GetPropertyValueFromParameterCollection(object model, IEnumerable<string> parameters)
+        {
+            if (parameters == null)
+            {
+                return new Tuple<bool, object>(true, model);
+            }
+
+            var currentObject = model;
+            Tuple<bool, object> currentResult = null;
+
+            foreach (var parameter in parameters)
+            {
+                currentResult = GetPropertyValue(currentObject, parameter);
+
+                if (currentResult.Item1 == false)
+                {
+                    return new Tuple<bool, object>(false, null);
+                }
+
+                currentObject = currentResult.Item2;
+            }
+
+            return new Tuple<bool, object>(true, currentObject);
         }
 
         /// <summary>
@@ -141,15 +184,20 @@
         /// <returns>Template with @Model.PropertyName blocks expanded.</returns>
         private string PerformSingleSubstitutions(string template, object model)
         {
-            var propertyExtractor = this.GetPropertyExtractor(model);
-
             return this.singleSubstitutionsRegEx.Replace(
                 template,
                 m =>
                 {
-                    var substitution = propertyExtractor(model, m.Groups["ParameterName"].Value);
+                    var properties = GetCaptureGroupValues(m, "ParameterName");
 
-                    return substitution == null ? "[ERR!]" : substitution.ToString();
+                    var substitution = GetPropertyValueFromParameterCollection(model, properties);
+
+                    if (!substitution.Item1)
+                    {
+                        return "[ERR!]";
+                    }
+
+                    return substitution.Item2 == null ? String.Empty : substitution.Item2.ToString();
                 });
         }
 
@@ -161,20 +209,25 @@
         /// <returns>Template with @Each.PropertyName blocks expanded.</returns>
         private string PerformEachSubstitutions(string template, object model)
         {
-            var propertyExtractor = this.GetPropertyExtractor(model);
-
             return this.eachSubstitutionRegEx.Replace(
                 template,
                 m =>
                 {
-                    var substitutionObject = propertyExtractor(model, m.Groups["ParameterName"].Value);
+                    var properties = GetCaptureGroupValues(m, "ParameterName");
 
-                    if (substitutionObject == null)
+                    var substitutionObject = GetPropertyValueFromParameterCollection(model, properties);
+
+                    if (substitutionObject.Item1 == false)
                     {
                         return "[ERR!]";
                     }
 
-                    var substitutionEnumerable = substitutionObject as IEnumerable;
+                    if (substitutionObject.Item2 == null)
+                    {
+                        return String.Empty;
+                    }
+
+                    var substitutionEnumerable = substitutionObject.Item2 as IEnumerable;
                     if (substitutionEnumerable == null)
                     {
                         return "[ERR!]";
@@ -199,8 +252,6 @@
         /// <returns>String result of the expansion of the @Each.</returns>
         private string ReplaceCurrentMatch(string contents, object item)
         {
-            var propertyExtractor = this.GetPropertyExtractor(item);
-
             return eachItemSubstitutionRegEx.Replace(
                 contents,
                 eachMatch =>
@@ -210,8 +261,16 @@
                         return item.ToString();
                     }
 
-                    var substitutionObject = propertyExtractor(item, eachMatch.Groups["ParameterName"].Value);
-                    return substitutionObject == null ? "[ERR!]" : substitutionObject.ToString();
+                    var properties = GetCaptureGroupValues(eachMatch, "ParameterName");
+
+                    var substitution = GetPropertyValueFromParameterCollection(item, properties);
+
+                    if (!substitution.Item1)
+                    {
+                        return "[ERR!]";
+                    }
+
+                    return substitution.Item2 == null ? String.Empty : substitution.Item2.ToString();
                 });
         }
 
@@ -250,20 +309,18 @@
         /// <returns>A bool representing the predicate result.</returns>
         private bool GetPredicateResult(string parameterName, object model)
         {
-            var propertyExtractor = this.GetPropertyExtractor(model);
-
             var predicateResult = false;
-            var substitutionObject = propertyExtractor(model, parameterName);
+            //var substitutionObject = propertyExtractor(model, parameterName);
 
-            if (substitutionObject != null)
-            {
-                predicateResult = GetPredicateResultFromSubstitutionObject(substitutionObject);
-            }
-            else if (parameterName.StartsWith("Has"))
-            {
-                substitutionObject = propertyExtractor(model, parameterName.Substring(3));
-                predicateResult = GetHasPredicateResultFromSubstitutionObject(substitutionObject);
-            }
+            //if (substitutionObject != null)
+            //{
+            //    predicateResult = GetPredicateResultFromSubstitutionObject(substitutionObject);
+            //}
+            //else if (parameterName.StartsWith("Has"))
+            //{
+            //    substitutionObject = propertyExtractor(model, parameterName.Substring(3));
+            //    predicateResult = GetHasPredicateResultFromSubstitutionObject(substitutionObject);
+            //}
 
             return predicateResult;
         }
