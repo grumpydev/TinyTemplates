@@ -390,6 +390,70 @@
             // Then
             Assert.Equal(@"<html><head></head><body></body></html>", output);
         }
+
+        [Fact]
+        public void Should_allow_property_name_in_current_inside_each_loop_for_dynamic_model_and_dynamic_collection()
+        {
+            const string input = @"<html><head></head><body><ul>@Each.Users;<li>@Current.Name;</li>@EndEach</ul></body></html>";
+            dynamic model = new ExpandoObject();
+            dynamic user1 = new ExpandoObject();
+            user1.Name = "Bob";
+            dynamic user2 = new ExpandoObject();
+            user2.Name = "Jim";
+            dynamic user3 = new ExpandoObject();
+            user3.Name = "Bill";
+            model.Users = new List<dynamic>() { user1, user2, user3 };
+
+            var output = viewEngine.Render(input, model);
+
+            Assert.Equal(@"<html><head></head><body><ul><li>Bob</li><li>Jim</li><li>Bill</li></ul></body></html>", output);
+        }
+
+        [Fact]
+        public void Should_allow_property_name_in_current_inside_each_loop_for_dynamic_model_and_normal_collection()
+        {
+            const string input = @"<html><head></head><body><ul>@Each.Users;<li>@Current.Name;</li>@EndEach</ul></body></html>";
+            dynamic model = new ExpandoObject();
+            model.Users = new List<User>() { new User("Bob"), new User("Jim"), new User("Bill")};
+
+            var output = viewEngine.Render(input, model);
+
+            Assert.Equal(@"<html><head></head><body><ul><li>Bob</li><li>Jim</li><li>Bill</li></ul></body></html>", output);
+        }
+
+        [Fact]
+        public void Should_allow_property_name_in_current_inside_each_loop_for_normal_model_and_dynamic_collection()
+        {
+            const string input = @"<html><head></head><body><ul>@Each.Users;<li>@Current.Name;</li>@EndEach</ul></body></html>";
+            dynamic user1 = new ExpandoObject();
+            user1.Name = "Bob";
+            dynamic user2 = new ExpandoObject();
+            user2.Name = "Jim";
+            dynamic user3 = new ExpandoObject();
+            user3.Name = "Bill";
+            var model = new { Users = new List<dynamic> { user1, user2, user3 } };
+
+            var output = viewEngine.Render(input, model);
+
+            Assert.Equal(@"<html><head></head><body><ul><li>Bob</li><li>Jim</li><li>Bill</li></ul></body></html>", output);
+        }
+    }
+
+    public class User
+    {
+        public User(string name)
+            : this(name, string.Empty)
+        {
+        }
+
+        public User(string name, string job)
+        {
+            Name = name;
+            Job = job;
+        }
+
+        public string Name { get; private set; }
+        public string Job { get; private set; }
     }
 
     public class FakeModel

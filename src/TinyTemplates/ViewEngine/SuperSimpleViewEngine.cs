@@ -36,14 +36,14 @@
         /// <summary>
         /// View engine transform processors
         /// </summary>
-        private readonly List<Func<string, object, Func<object, string, object>, string>> processors;
+        private readonly List<Func<string, object, string>> processors;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SuperSimpleViewEngine"/> class.
         /// </summary>
         public SuperSimpleViewEngine()
         {
-            this.processors = new List<Func<string, object, Func<object, string, object>, string>>
+            this.processors = new List<Func<string, object, string>>
                 {
                     this.PerformSingleSubstitutions,
                     this.PerformEachSubstitutions,
@@ -64,9 +64,7 @@
                 return template;
             }
 
-            var propertyExtractor = this.GetPropertyExtractor(model);
-
-            return this.processors.Aggregate(template, (current, processor) => processor(current, model, propertyExtractor));
+            return this.processors.Aggregate(template, (current, processor) => processor(current, model));
         }
 
         /// <summary>
@@ -140,10 +138,11 @@
         /// </summary>
         /// <param name="template">The template.</param>
         /// <param name="model">The model.</param>
-        /// <param name="propertyExtractor">The property extractor.</param>
         /// <returns>Template with @Model.PropertyName blocks expanded.</returns>
-        private string PerformSingleSubstitutions(string template, object model, Func<object, string, object> propertyExtractor)
+        private string PerformSingleSubstitutions(string template, object model)
         {
+            var propertyExtractor = this.GetPropertyExtractor(model);
+
             return this.singleSubstitutionsRegEx.Replace(
                 template,
                 m =>
@@ -159,10 +158,11 @@
         /// </summary>
         /// <param name="template">The template.</param>
         /// <param name="model">The model.</param>
-        /// <param name="propertyExtractor">The property extractor.</param>
         /// <returns>Template with @Each.PropertyName blocks expanded.</returns>
-        private string PerformEachSubstitutions(string template, object model, Func<object, string, object> propertyExtractor)
+        private string PerformEachSubstitutions(string template, object model)
         {
+            var propertyExtractor = this.GetPropertyExtractor(model);
+
             return this.eachSubstitutionRegEx.Replace(
                 template,
                 m =>
@@ -180,13 +180,38 @@
                         return "[ERR!]";
                     }
 
+                    var contents = m.Groups["Contents"].Value;
                     var result = string.Empty;
                     foreach (var item in substitutionEnumerable)
                     {
-                        result += eachItemSubstitutionRegEx.Replace(m.Groups["Contents"].Value, item.ToString());
+                        result += ReplaceCurrentMatch(contents, item);
                     }
 
                     return result;
+                });
+        }
+
+        /// <summary>
+        /// Expand a @Current match inside an @Each iterator
+        /// </summary>
+        /// <param name="contents">Contents of the @Each block</param>
+        /// <param name="item">Current item from the @Each enumerable</param>
+        /// <returns>String result of the expansion of the @Each.</returns>
+        private string ReplaceCurrentMatch(string contents, object item)
+        {
+            var propertyExtractor = this.GetPropertyExtractor(item);
+
+            return eachItemSubstitutionRegEx.Replace(
+                contents,
+                eachMatch =>
+                {
+                    if (String.IsNullOrEmpty(eachMatch.Groups["ParameterName"].Value))
+                    {
+                        return item.ToString();
+                    }
+
+                    var substitutionObject = propertyExtractor(item, eachMatch.Groups["ParameterName"].Value);
+                    return substitutionObject == null ? "[ERR!]" : substitutionObject.ToString();
                 });
         }
 
@@ -195,9 +220,8 @@
         /// </summary>
         /// <param name="template">The template.</param>
         /// <param name="model">The model.</param>
-        /// <param name="propertyExtractor">The property extractor.</param>
         /// <returns>Template with @If.PropertyName @IfNot.PropertyName blocks removed/expanded.</returns>
-        private string PerformConditionalSubstitutions(string template, object model, Func<object, string, object> propertyExtractor)
+        private string PerformConditionalSubstitutions(string template, object model)
         {
             var result = template;
 
@@ -205,7 +229,7 @@
                 result,
                 m =>
                 {
-                    var predicateResult = GetPredicateResult(m.Groups["ParameterName"].Value, propertyExtractor, model);
+                    var predicateResult = GetPredicateResult(m.Groups["ParameterName"].Value, model);
 
                     if (m.Groups["Not"].Value == "Not")
                     {
@@ -222,11 +246,12 @@
         /// Gets the predicate result for an If or IfNot block
         /// </summary>
         /// <param name="parameterName">The parameter name.</param>
-        /// <param name="propertyExtractor">The property extractor function.</param>
         /// <param name="model">The model.</param>
         /// <returns>A bool representing the predicate result.</returns>
-        private static bool GetPredicateResult(string parameterName, Func<object, string, object> propertyExtractor, object model)
+        private bool GetPredicateResult(string parameterName, object model)
         {
+            var propertyExtractor = this.GetPropertyExtractor(model);
+
             var predicateResult = false;
             var substitutionObject = propertyExtractor(model, parameterName);
 
