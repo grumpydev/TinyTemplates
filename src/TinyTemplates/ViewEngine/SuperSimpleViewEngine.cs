@@ -288,7 +288,8 @@
                 result,
                 m =>
                 {
-                    var predicateResult = GetPredicateResult(m.Groups["ParameterName"].Value, model);
+                    var properties = GetCaptureGroupValues(m, "ParameterName");
+                    var predicateResult = GetPredicateResult(model, properties);
 
                     if (m.Groups["Not"].Value == "Not")
                     {
@@ -304,25 +305,29 @@
         /// <summary>
         /// Gets the predicate result for an If or IfNot block
         /// </summary>
-        /// <param name="parameterName">The parameter name.</param>
-        /// <param name="model">The model.</param>
-        /// <returns>A bool representing the predicate result.</returns>
-        private bool GetPredicateResult(string parameterName, object model)
+        /// <param name="item">The item to evaluate</param>
+        /// <param name="properties">Property list to evaluate</param>
+        /// <returns>Bool representing the predicate result</returns>
+        private bool GetPredicateResult(object item, IEnumerable<string> properties)
         {
-            var predicateResult = false;
-            //var substitutionObject = propertyExtractor(model, parameterName);
+            var substitutionObject = GetPropertyValueFromParameterCollection(item, properties);
 
-            //if (substitutionObject != null)
-            //{
-            //    predicateResult = GetPredicateResultFromSubstitutionObject(substitutionObject);
-            //}
-            //else if (parameterName.StartsWith("Has"))
-            //{
-            //    substitutionObject = propertyExtractor(model, parameterName.Substring(3));
-            //    predicateResult = GetHasPredicateResultFromSubstitutionObject(substitutionObject);
-            //}
+            if (substitutionObject.Item1 == false && properties.Last().StartsWith("Has"))
+            {
+                var newProperties =
+                    properties.Take(properties.Count() - 1).Concat(new string[] { properties.Last().Substring(3) });
 
-            return predicateResult;
+                substitutionObject = GetPropertyValueFromParameterCollection(item, newProperties);
+
+                return GetHasPredicateResultFromSubstitutionObject(substitutionObject.Item2);
+            }
+
+            if (substitutionObject.Item2 == null)
+            {
+                return false;
+            }
+
+            return GetPredicateResultFromSubstitutionObject(substitutionObject.Item2);;
         }
 
         /// <summary>
