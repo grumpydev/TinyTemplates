@@ -31,7 +31,7 @@
         /// <summary>
         /// Compiled Regex for if blocks
         /// </summary>
-        private readonly Regex conditionalSubstitutionRegEx = new Regex(@"@If(?<Not>Not)?(?:\.(?<ParameterName>[a-zA-Z0-9-_]+))+;(?<Contents>.*?)@EndIf", RegexOptions.Compiled | RegexOptions.Singleline);
+        private readonly Regex conditionalSubstitutionRegEx = new Regex(@"@If(?<Not>Not)?(?:\.(?<ParameterName>[a-zA-Z0-9-_]+))+;(?<Contents>.*?)@EndIf;", RegexOptions.Compiled | RegexOptions.Singleline);
 
         /// <summary>
         /// View engine transform processors

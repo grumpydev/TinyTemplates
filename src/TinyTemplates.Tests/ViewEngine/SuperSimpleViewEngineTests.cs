@@ -241,7 +241,7 @@
         public void Should_render_block_when_if_statement_returns_true()
         {
             // Given
-            const string input = @"<html><head></head><body>@If.HasUsers;<ul>@Each.Users;<li>Hello @Current;, @Model.Name; says hello!</li>@EndEach</ul>@EndIf</body></html>";
+            const string input = @"<html><head></head><body>@If.HasUsers;<ul>@Each.Users;<li>Hello @Current;, @Model.Name; says hello!</li>@EndEach</ul>@EndIf;</body></html>";
             var model = new FakeModel("Nancy", new List<string>() { "Bob", "Jim", "Bill" });
 
             // When
@@ -255,7 +255,7 @@
         public void Should_not_render_block_when_if_statement_returns_false()
         {
             // Given
-            const string input = @"<html><head></head><body>@If.HasUsers;<ul>@Each.Users;<li>Hello @Current;, @Model.Name; says hello!</li>@EndEach</ul>@EndIf</body></html>";
+            const string input = @"<html><head></head><body>@If.HasUsers;<ul>@Each.Users;<li>Hello @Current;, @Model.Name; says hello!</li>@EndEach</ul>@EndIf;</body></html>";
             var model = new FakeModel("Nancy", new List<string>());
 
             // When
@@ -269,7 +269,7 @@
         public void Should_not_render_block_when_ifnot_statements_returns_true()
         {
             // Given
-            const string input = @"<html><head></head><body>@IfNot.HasUsers;<p>No users found!</p>@EndIf<ul>@Each.Users;<li>Hello @Current;, @Model.Name; says hello!</li>@EndEach</ul></body></html>";
+            const string input = @"<html><head></head><body>@IfNot.HasUsers;<p>No users found!</p>@EndIf;<ul>@Each.Users;<li>Hello @Current;, @Model.Name; says hello!</li>@EndEach</ul></body></html>";
             var model = new FakeModel("Nancy", new List<string>() { "Bob", "Jim", "Bill" });
 
             // When
@@ -283,7 +283,7 @@
         public void Should_render_block_when_ifnot_statement_returns_false()
         {
             // Given
-            const string input = @"<html><head></head><body>@IfNot.HasUsers;<p>No users found!</p>@EndIf<ul>@Each.Users;<li>Hello @Current;, @Model.Name; says hello!</li>@EndEach</ul></body></html>";
+            const string input = @"<html><head></head><body>@IfNot.HasUsers;<p>No users found!</p>@EndIf;<ul>@Each.Users;<li>Hello @Current;, @Model.Name; says hello!</li>@EndEach</ul></body></html>";
             var model = new FakeModel("Nancy", new List<string>());
 
             // When
@@ -297,7 +297,7 @@
         public void Should_not_conflict_when_if_and_ifNot_statements_combined_but_not_nested()
         {
             // Given
-            const string input = @"<html><head></head><body>@IfNot.HasUsers;<p>No users found!</p>@EndIf@If.HasUsers;<ul>@Each.Users;<li>Hello @Current;, @Model.Name; says hello!</li>@EndEach</ul>@EndIf</body></html>";
+            const string input = @"<html><head></head><body>@IfNot.HasUsers;<p>No users found!</p>@EndIf;@If.HasUsers;<ul>@Each.Users;<li>Hello @Current;, @Model.Name; says hello!</li>@EndEach</ul>@EndIf;</body></html>";
             var model = new FakeModel("Nancy", new List<string>());
 
             // When
@@ -311,7 +311,7 @@
         public void Should_match_multiple_if_statements_correctly()
         {
             // Given
-            const string input = "@If.One;<p>One</p>@EndIf @If.Two;<p>Two</p>@EndIf";
+            const string input = "@If.One;<p>One</p>@EndIf; @If.Two;<p>Two</p>@EndIf;";
             var model = new { One = true, Two = true };
 
             // When
@@ -339,7 +339,7 @@
         public void Should_return_true_for_ifhascollection_when_if_model_has_a_collection_with_items_but_no_bool()
         {
             // Given
-            const string input = @"<html><head></head><body>@If.HasUsers;<ul>@Each.Users;<li>Hello @Current;, @Model.Name; says hello!</li>@EndEach</ul>@EndIf</body></html>";
+            const string input = @"<html><head></head><body>@If.HasUsers;<ul>@Each.Users;<li>Hello @Current;, @Model.Name; says hello!</li>@EndEach</ul>@EndIf;</body></html>";
             var model = new { Users = new List<string>() { "Bob", "Jim", "Bill" }, Name = "Nancy" };
 
             // When
@@ -353,7 +353,7 @@
         public void Should_return_false_for_ifnot_hascollection_when_model_has_a_collection_with_items_but_no_bool()
         {
             // Given
-            const string input = @"<html><head></head><body>@IfNot.HasUsers;<p>No Users!</p>@EndIf</body></html>";
+            const string input = @"<html><head></head><body>@IfNot.HasUsers;<p>No Users!</p>@EndIf;</body></html>";
             var model = new { Users = new List<string>() { "Bob", "Jim", "Bill" } };
 
             // When
@@ -367,7 +367,7 @@
         public void Should_ignore_item_for_implicit_has_support_when_item_isnt_a_collection()
         {
             // Given
-            const string input = @"<html><head></head><body>@If.HasUsers;<p>Users!</p>@EndIf</body></html>";
+            const string input = @"<html><head></head><body>@If.HasUsers;<p>Users!</p>@EndIf;</body></html>";
             var model = new { Users = new object() };
 
             // When
@@ -381,7 +381,7 @@
         public void Should_give_precedence_to_hasitem_bool_when_model_has_bool_and_collection()
         {
             // Given
-            const string input = @"<html><head></head><body>@If.HasUsers;<ul>@Each.Users;<li>Hello @Current;, @Model.Name; says hello!</li>@EndEach</ul>@EndIf</body></html>";
+            const string input = @"<html><head></head><body>@If.HasUsers;<ul>@Each.Users;<li>Hello @Current;, @Model.Name; says hello!</li>@EndEach</ul>@EndIf;</body></html>";
             var model = new { HasUsers = false, Users = new List<string>() { "Bob", "Jim", "Bill" }, Name = "Nancy" };
 
             // When
