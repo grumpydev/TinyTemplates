@@ -148,7 +148,7 @@
         /// <summary>
         /// Gets a property value from a collection of nested parameter names
         /// </summary>
-        /// <param name="model">The model</param>
+        /// <param name="model">The model containing properties.</param>
         /// <param name="parameters">A collection of nested parameters (e.g. User, Name</param>
         /// <returns>Tuple - Item1 being a bool for whether the evaluation was sucessful, Item2 being the value.</returns>
         private static Tuple<bool, object> GetPropertyValueFromParameterCollection(object model, IEnumerable<string> parameters)
@@ -159,7 +159,7 @@
             }
 
             var currentObject = model;
-            Tuple<bool, object> currentResult = null;
+            Tuple<bool, object> currentResult;
 
             foreach (var parameter in parameters)
             {
@@ -174,6 +174,70 @@
             }
 
             return new Tuple<bool, object>(true, currentObject);
+        }
+
+        /// <summary>
+        /// Gets the predicate result for an If or IfNot block
+        /// </summary>
+        /// <param name="item">The item to evaluate</param>
+        /// <param name="properties">Property list to evaluate</param>
+        /// <returns>Bool representing the predicate result</returns>
+        private static bool GetPredicateResult(object item, IEnumerable<string> properties)
+        {
+            var substitutionObject = GetPropertyValueFromParameterCollection(item, properties);
+
+            if (substitutionObject.Item1 == false && properties.Last().StartsWith("Has"))
+            {
+                var newProperties =
+                    properties.Take(properties.Count() - 1).Concat(new[] { properties.Last().Substring(3) });
+
+                substitutionObject = GetPropertyValueFromParameterCollection(item, newProperties);
+
+                return GetHasPredicateResultFromSubstitutionObject(substitutionObject.Item2);
+            }
+
+            if (substitutionObject.Item2 == null)
+            {
+                return false;
+            }
+
+            return GetPredicateResultFromSubstitutionObject(substitutionObject.Item2);
+        }
+
+        /// <summary>
+        /// Returns the predicate result if the substitionObject is a valid bool
+        /// </summary>
+        /// <param name="substitutionObject">The substitution object.</param>
+        /// <returns>Bool value of the substitutionObject, or false if unable to cast.</returns>
+        private static bool GetPredicateResultFromSubstitutionObject(object substitutionObject)
+        {
+            var predicateResult = false;
+
+            var substitutionBool = substitutionObject as bool?;
+            if (substitutionBool != null)
+            {
+                predicateResult = substitutionBool.Value;
+            }
+
+            return predicateResult;
+        }
+
+        /// <summary>
+        /// Returns the predicate result if the substitionObject is a valid ICollection
+        /// </summary>
+        /// <param name="substitutionObject">The substitution object.</param>
+        /// <returns>Bool value of the whether the ICollection has items, or false if unable to cast.</returns>
+        private static bool GetHasPredicateResultFromSubstitutionObject(object substitutionObject)
+        {
+            var predicateResult = false;
+
+            var substitutionCollection = substitutionObject as ICollection;
+            if (substitutionCollection != null)
+            {
+                predicateResult = substitutionCollection.Count != 0;
+            }
+
+            return predicateResult;
         }
 
         /// <summary>
@@ -252,7 +316,7 @@
         /// <returns>String result of the expansion of the @Each.</returns>
         private string ReplaceCurrentMatch(string contents, object item)
         {
-            return eachItemSubstitutionRegEx.Replace(
+            return this.eachItemSubstitutionRegEx.Replace(
                 contents,
                 eachMatch =>
                 {
@@ -289,6 +353,7 @@
                 m =>
                 {
                     var properties = GetCaptureGroupValues(m, "ParameterName");
+
                     var predicateResult = GetPredicateResult(model, properties);
 
                     if (m.Groups["Not"].Value == "Not")
@@ -300,70 +365,6 @@
                 });
 
             return result;
-        }
-
-        /// <summary>
-        /// Gets the predicate result for an If or IfNot block
-        /// </summary>
-        /// <param name="item">The item to evaluate</param>
-        /// <param name="properties">Property list to evaluate</param>
-        /// <returns>Bool representing the predicate result</returns>
-        private bool GetPredicateResult(object item, IEnumerable<string> properties)
-        {
-            var substitutionObject = GetPropertyValueFromParameterCollection(item, properties);
-
-            if (substitutionObject.Item1 == false && properties.Last().StartsWith("Has"))
-            {
-                var newProperties =
-                    properties.Take(properties.Count() - 1).Concat(new string[] { properties.Last().Substring(3) });
-
-                substitutionObject = GetPropertyValueFromParameterCollection(item, newProperties);
-
-                return GetHasPredicateResultFromSubstitutionObject(substitutionObject.Item2);
-            }
-
-            if (substitutionObject.Item2 == null)
-            {
-                return false;
-            }
-
-            return GetPredicateResultFromSubstitutionObject(substitutionObject.Item2);;
-        }
-
-        /// <summary>
-        /// Returns the predicate result if the substitionObject is a valid bool
-        /// </summary>
-        /// <param name="substitutionObject">The substitution object.</param>
-        /// <returns>Bool value of the substitutionObject, or false if unable to cast.</returns>
-        private static bool GetPredicateResultFromSubstitutionObject(object substitutionObject)
-        {
-            var predicateResult = false;
-
-            var substitutionBool = substitutionObject as bool?;
-            if (substitutionBool != null)
-            {
-                predicateResult = substitutionBool.Value;
-            }
-
-            return predicateResult;
-        }
-
-        /// <summary>
-        /// Returns the predicate result if the substitionObject is a valid ICollection
-        /// </summary>
-        /// <param name="substitutionObject">The substitution object.</param>
-        /// <returns>Bool value of the whether the ICollection has items, or false if unable to cast.</returns>
-        private static bool GetHasPredicateResultFromSubstitutionObject(object substitutionObject)
-        {
-            var predicateResult = false;
-
-            var substitutionCollection = substitutionObject as ICollection;
-            if (substitutionCollection != null)
-            {
-                predicateResult = substitutionCollection.Count != 0;
-            }
-
-            return predicateResult;
         }
     }
 }
