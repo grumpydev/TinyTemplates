@@ -16,22 +16,22 @@
         /// <summary>
         /// Compiled Regex for single substitutions
         /// </summary>
-        private readonly Regex singleSubstitutionsRegEx = new Regex(@"@Model(?:\.(?<ParameterName>[a-zA-Z0-9-_]+))+;", RegexOptions.Compiled);
+        private readonly Regex singleSubstitutionsRegEx = new Regex(@"@Model(?:\.(?<ParameterName>[a-zA-Z0-9-_]+))+;?", RegexOptions.Compiled);
 
         /// <summary>
         /// Compiled Regex for each blocks
         /// </summary>
-        private readonly Regex eachSubstitutionRegEx = new Regex(@"@Each(?:\.(?<ParameterName>[a-zA-Z0-9-_]+))+;(?<Contents>.*?)@EndEach", RegexOptions.Compiled | RegexOptions.Singleline);
+        private readonly Regex eachSubstitutionRegEx = new Regex(@"@Each(?:\.(?<ParameterName>[a-zA-Z0-9-_]+))+;?(?<Contents>.*?)@EndEach;?", RegexOptions.Compiled | RegexOptions.Singleline);
 
         /// <summary>
         /// Compiled Regex for each block current substitutions
         /// </summary>
-        private readonly Regex eachItemSubstitutionRegEx = new Regex(@"@Current(?:\.(?<ParameterName>[a-zA-Z0-9-_]+))*;", RegexOptions.Compiled);
+        private readonly Regex eachItemSubstitutionRegEx = new Regex(@"@Current(?:\.(?<ParameterName>[a-zA-Z0-9-_]+))*;?", RegexOptions.Compiled);
 
         /// <summary>
         /// Compiled Regex for if blocks
         /// </summary>
-        private readonly Regex conditionalSubstitutionRegEx = new Regex(@"@If(?<Not>Not)?(?:\.(?<ParameterName>[a-zA-Z0-9-_]+))+;(?<Contents>.*?)@EndIf;", RegexOptions.Compiled | RegexOptions.Singleline);
+        private readonly Regex conditionalSubstitutionRegEx = new Regex(@"@If(?<Not>Not)?(?:\.(?<ParameterName>[a-zA-Z0-9-_]+))+;?(?<Contents>.*?)@EndIf;?", RegexOptions.Compiled | RegexOptions.Singleline);
 
         /// <summary>
         /// View engine transform processors
